@@ -1,5 +1,5 @@
 
-const API_URL = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/pastes`;
+const API_URL = "https://paste-app-backend-v2.vercel.app/api/pastes";
 
 // Fetch all pastes
 export const getPastes = async () => {
