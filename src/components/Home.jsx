@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useSearchParams } from 'react-router-dom'
-import { addToPastes, updateToPastes } from '../redux/pasteSlice'
+import { setPastes } from '../redux/pasteSlice'
 import { Copy } from 'lucide-react'
 import toast from 'react-hot-toast'
+import {
+  getPastes,
+  createPaste as createPasteAPI,
+  updatePaste as updatePasteAPI,
+} from '../api/pasteApi'
 
 const Home = () => {
 
@@ -17,6 +22,22 @@ const Home = () => {
   const dispatch = useDispatch()
 
   const allPastes = useSelector((state) => state.paste.pastes)
+
+  useEffect(() => {
+    async function loadPastes() {
+      try {
+        const data = await getPastes();
+
+        dispatch(setPastes(data));
+        console.log("Pastes loaded from backend:", data);
+      } catch (error) {
+        console.error("Failed to fetch pastes:", error);
+        toast.error("Failed to load pastes");
+      }
+    }
+
+    loadPastes();
+  }, [dispatch]);
 
   useEffect(() => {
 
@@ -35,50 +56,62 @@ const Home = () => {
 
   }, [pasteId, allPastes])
 
-  function createPaste() {
-
+  
+  async function createPaste() {
     if (!title.trim()) {
-      toast.error("Please enter a title")
-      return
+      toast.error("Please enter a title");
+      return;
     }
 
     if (!value.trim()) {
-      toast.error("Please enter some content")
-      return
+      toast.error("Please enter some content");
+      return;
     }
 
-    const paste = {
+    const pasteData = {
       title: title.trim(),
-      content: value,
-      _id: pasteId || Date.now().toString(36),
-      createdAt: new Date().toISOString(),
-    }
+      content: value.trim(),
+    };
 
-    if (pasteId) {
+    try {
+      if (pasteId) {
+        // Update the existing paste in MongoDB
+        await updatePasteAPI(pasteId, pasteData);
 
-      dispatch(updateToPastes(paste))
+        toast.success("Paste updated successfully!");
+      } else {
+        // Prevent duplicates using the currently loaded pastes
+        const duplicate = allPastes.some(
+          (item) =>
+            item.title.trim().toLowerCase() ===
+              pasteData.title.toLowerCase() &&
+            item.content.trim() === pasteData.content
+        );
 
-    } else {
+        if (duplicate) {
+          toast.error("Same paste already exists!");
+          return;
+        }
 
-      const duplicate = allPastes.some(
-        (item) =>
-          item.title.trim().toLowerCase() ===
-            title.trim().toLowerCase() &&
-          item.content.trim() === value.trim()
-      )
+        // Create a new paste in MongoDB
+        await createPasteAPI(pasteData);
 
-      if (duplicate) {
-        toast.error("Same paste already exists!")
-        return
+        toast.success("Paste created successfully!");
       }
 
-      dispatch(addToPastes(paste))
-    }
+      // Refresh Redux with the latest database records
+      const updatedPastes = await getPastes();
+      dispatch(setPastes(updatedPastes));
 
-    setTitle("")
-    setValue("")
-    setSearchParams({})
+      setTitle("");
+      setValue("");
+      setSearchParams({});
+    } catch (error) {
+      console.error("Save paste error:", error);
+      toast.error(error.message || "Failed to save paste");
+    }
   }
+
 
   function copyContent() {
 

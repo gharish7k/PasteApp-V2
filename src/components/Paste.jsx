@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
-import { removeFromPastes } from '../redux/pasteSlice'
+import { setPastes, removeFromPastes } from '../redux/pasteSlice'
 import {
   Pencil,
   Trash2,
@@ -12,6 +12,8 @@ import {
   X
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { getPastes } from '../api/pasteApi'
+
 
 const Paste = () => {
 
@@ -23,15 +25,59 @@ const Paste = () => {
 
   const dispatch = useDispatch()
 
+  useEffect(() => {
+
+    getPastes()
+      .then((data) => {
+        console.log("Pastes page received:", data)
+
+        dispatch(setPastes(data))
+      })
+      .catch((error) => {
+        console.error("Failed to fetch pastes:", error)
+        toast.error("Failed to load pastes")
+      })
+
+  }, [dispatch])
+
   const filteredData = pastes.filter((paste) =>
     paste.title
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
   )
 
-  function handleDelete(pasteId) {
-    dispatch(removeFromPastes(pasteId))
+  
+  
+  async function handleDelete(pasteId) {
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/pastes/${pasteId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || data.message || "Failed to delete paste"
+        );
+      }
+
+      // Reload the authoritative database state
+      const updatedPastes = await getPastes();
+
+      dispatch(setPastes(updatedPastes));
+
+      toast.success("Paste deleted successfully!");
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error(error.message || "Failed to delete paste");
+    }
   }
+
+
 
   function handleCopy(content) {
 
